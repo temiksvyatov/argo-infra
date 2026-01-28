@@ -1,0 +1,66 @@
+---
+# Тестовый Pod - Istio управляет mTLS
+# Сертификаты монтируются в Istio sidecar через аннотации
+apiVersion: v1
+kind: Pod
+metadata:
+  name: postgres-test-simple
+  namespace: postgres-client
+  labels:
+    app: postgres-test-simple
+  annotations:
+    # Монтирование сертификатов в Istio sidecar
+    # defaultMode: 288 = 0440 в восьмеричной (read для owner и group)
+    sidecar.istio.io/userVolume: '[{"name":"postgres-certs","secret":{"secretName":"postgres-apidoc-certs","defaultMode":288}}]'
+    sidecar.istio.io/userVolumeMount: '[{"name":"postgres-certs","mountPath":"/etc/certs/apidoc","readonly":true}]'
+spec:
+  # Pod-level security context
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 999  # postgres user
+    runAsGroup: 999
+    fsGroup: 999
+    seccompProfile:
+      type: RuntimeDefault
+  
+  containers:
+  - name: postgres-client
+    image: postgres:18
+    command: ["sleep", "infinity"]
+    
+    # Container-level security context
+    securityContext:
+      allowPrivilegeEscalation: false
+      runAsNonRoot: true
+      runAsUser: 999
+      capabilities:
+        drop:
+          - ALL
+      readOnlyRootFilesystem: false
+    
+    env:
+    - name: PGHOST
+      value: "srv8-objkrugess.mfactory.nxcloud.nexign.com"
+    - name: PGPORT
+      value: "5432"
+    - name: PGUSER
+      value: "apidoc"
+    - name: PGDATABASE
+      value: "apidoc"
+    # БЕЗ SSL - Istio sidecar добавит mTLS
+    - name: PGSSLMODE
+      value: "disable"
+    
+    volumeMounts:
+    # Основному контейнеру сертификаты не нужны
+    - name: tmp
+      mountPath: /tmp
+    - name: postgres-tmp
+      mountPath: /var/lib/postgresql
+  
+  volumes:
+  - name: tmp
+    emptyDir: {}
+  - name: postgres-tmp
+    emptyDir: {}
+  # Secret будет смонтирован через аннотации в sidecar

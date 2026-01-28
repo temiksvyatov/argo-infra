@@ -1,0 +1,218 @@
+---
+# Пример Production Deployment с полным security context
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-apidoc
+  namespace: postgres-client
+  labels:
+    app: app-apidoc
+    component: application
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: app-apidoc
+  template:
+    metadata:
+      labels:
+        app: app-apidoc
+        version: v1
+    spec:
+      # Pod-level security context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      
+      # Автоматический перезапуск DNS для обновления DNS записей
+      dnsPolicy: ClusterFirst
+      
+      containers:
+      - name: application
+        image: your-app:latest  # Замените на ваш образ
+        
+        # Container-level security context
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: true
+        
+        # Environment variables для подключения к PostgreSQL
+        env:
+        - name: DB_HOST
+          value: "srv8-objkrugess.mfactory.nxcloud.nexign.com"
+        - name: DB_PORT
+          value: "5432"
+        - name: DB_USER
+          value: "apidoc"
+        - name: DB_NAME
+          value: "apidoc"
+        - name: DB_SSLMODE
+          value: "disable"  # Istio добавит mTLS автоматически
+        
+        # Опционально: явное использование сертификатов
+        # - name: PGSSLMODE
+        #   value: "verify-full"
+        # - name: PGSSLROOTCERT
+        #   value: "/etc/postgres-certs/ca.crt"
+        # - name: PGSSLCERT
+        #   value: "/etc/postgres-certs/tls.crt"
+        # - name: PGSSLKEY
+        #   value: "/etc/postgres-certs/tls.key"
+        
+        # Resources
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        
+        # Probes
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        
+        # Volume mounts
+        volumeMounts:
+        # Для readOnlyRootFilesystem: true нужны writable volumes
+        - name: tmp
+          mountPath: /tmp
+        - name: cache
+          mountPath: /app/cache
+        
+        # Опционально: сертификаты если приложение управляет ими
+        # - name: postgres-certs
+        #   mountPath: /etc/postgres-certs
+        #   readOnly: true
+      
+      volumes:
+      - name: tmp
+        emptyDir:
+          medium: Memory
+          sizeLimit: 100Mi
+      - name: cache
+        emptyDir:
+          sizeLimit: 500Mi
+      
+      # Опционально: сертификаты
+      # - name: postgres-certs
+      #   secret:
+      #     secretName: postgres-apidoc-certs
+      #     defaultMode: 0400
+      
+      # Affinity для распределения подов по разным нодам
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - app-apidoc
+              topologyKey: kubernetes.io/hostname
+
+---
+# Service для доступа к приложению
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-apidoc
+  namespace: postgres-client
+  labels:
+    app: app-apidoc
+spec:
+  selector:
+    app: app-apidoc
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+    protocol: TCP
+  type: ClusterIP
+
+---
+# ServiceAccount для приложения (best practice)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: app-apidoc
+  namespace: postgres-client
+  labels:
+    app: app-apidoc
+
+---
+# NetworkPolicy - разрешить только исходящие соединения к PostgreSQL
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: app-apidoc-egress
+  namespace: postgres-client
+spec:
+  podSelector:
+    matchLabels:
+      app: app-apidoc
+  policyTypes:
+  - Egress
+  egress:
+  # Разрешить DNS
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    ports:
+    - protocol: UDP
+      port: 53
+  # Разрешить подключение к PostgreSQL
+  - to:
+    - podSelector: {}  # Все поды в namespace (для Istio)
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Разрешить Kubernetes API (для service mesh)
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    ports:
+    - protocol: TCP
+      port: 443
+
+---
+# PodDisruptionBudget для обеспечения доступности
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: app-apidoc-pdb
+  namespace: postgres-client
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: app-apidoc

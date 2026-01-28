@@ -1,0 +1,16 @@
+---
+# ServiceEntry для внешнего PostgreSQL сервера
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: postgres-external
+  namespace: postgres-client
+spec:
+  hosts:
+  - srv8-objkrugess.mfactory.nxcloud.nexign.com
+  ports:
+  - number: 5432
+    name: postgres
+    protocol: TCP
+  location: MESH_EXTERNAL
+  resolution: DNS

@@ -1,0 +1,50 @@
+---
+# DestinationRule для apidoc с mTLS
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: postgres-apidoc-mtls
+  namespace: postgres-client
+spec:
+  host: srv8-objkrugess.mfactory.nxcloud.nexign.com
+  trafficPolicy:
+    tls:
+      mode: MUTUAL
+      clientCertificate: /etc/certs/apidoc/tls.crt
+      privateKey: /etc/certs/apidoc/tls.key
+      caCertificates: /etc/certs/apidoc/ca.crt
+      sni: srv8-objkrugess.mfactory.nxcloud.nexign.com
+
+---
+# DestinationRule для apiman с mTLS
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: postgres-apiman-mtls
+  namespace: postgres-client
+spec:
+  host: srv8-objkrugess.mfactory.nxcloud.nexign.com
+  trafficPolicy:
+    tls:
+      mode: MUTUAL
+      clientCertificate: /etc/certs/apiman/tls.crt
+      privateKey: /etc/certs/apiman/tls.key
+      caCertificates: /etc/certs/apiman/ca.crt
+      sni: srv8-objkrugess.mfactory.nxcloud.nexign.com
+
+---
+# DestinationRule для kpi с mTLS
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: postgres-kpi-mtls
+  namespace: postgres-client
+spec:
+  host: srv8-objkrugess.mfactory.nxcloud.nexign.com
+  trafficPolicy:
+    tls:
+      mode: MUTUAL
+      clientCertificate: /etc/certs/kpi/tls.crt
+      privateKey: /etc/certs/kpi/tls.key
+      caCertificates: /etc/certs/kpi/ca.crt
+      sni: srv8-objkrugess.mfactory.nxcloud.nexign.com

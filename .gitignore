@@ -1,0 +1,18 @@
+# Сертификаты и ключи
+certs/
+*.pem
+*.key
+*.crt
+*.csr
+
+# Docker volumes
+postgres_data/
+
+# Логи
+*.log
+pg_log/
+
+# Временные файлы
+*.tmp
+*.swp
+*~

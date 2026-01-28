@@ -1,0 +1,11 @@
+---
+# Отключаем Istio mTLS для namespace
+# чтобы не было конфликта с внешним PostgreSQL mTLS
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: postgres-client
+spec:
+  mtls:
+    mode: PERMISSIVE  # Разрешаем как mTLS так и plaintext
