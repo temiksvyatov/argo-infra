@@ -38,7 +38,7 @@ OU = IT
 CN = $CUSTOM_HOSTNAME
 
 [v3_req]
-keyUsage = keyEncipherment, dataEncipherment
+keyUsage = critical, digitalSignature, keyEncipherment
 extendedKeyUsage = serverAuth
 subjectAltName = @alt_names
 

@@ -1,0 +1,29 @@
+---
+# EnvoyFilter для добавления ALPN "postgresql" к исходящим TLS соединениям
+# Сертификаты настраиваются в DestinationRule, здесь только ALPN
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: postgres-alpn
+  namespace: postgres-client
+spec:
+  workloadSelector:
+    labels:
+      app: postgres-test-simple  # Применяется к подам с этим label
+  configPatches:
+  # Патч для добавления ALPN в upstream TLS context
+  - applyTo: CLUSTER
+    match:
+      context: SIDECAR_OUTBOUND
+      cluster:
+        name: "outbound|5432||srv8-objkrugess.mfactory.nxcloud.nexign.com"
+    patch:
+      operation: MERGE
+      value:
+        transport_socket:
+          name: envoy.transport_sockets.tls
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+            common_tls_context:
+              alpn_protocols:
+              - "postgresql"

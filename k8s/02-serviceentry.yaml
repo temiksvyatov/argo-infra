@@ -8,9 +8,13 @@ metadata:
 spec:
   hosts:
   - srv8-objkrugess.mfactory.nxcloud.nexign.com
+  exportTo:
+    - "."
   ports:
   - number: 5432
     name: postgres
     protocol: TCP
   location: MESH_EXTERNAL
   resolution: DNS
+  endpoints:
+  - address: srv8-objkrugess.mfactory.nxcloud.nexign.com
